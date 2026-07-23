@@ -8,6 +8,8 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.1.0 - 2026-07-23
+
 ### Added
 
 - Project scaffold: package structure, analysis options, CI, and
