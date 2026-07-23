@@ -38,11 +38,33 @@ TrackingData? mlKitFaceToTrackingData(
   Size imageSize, {
   Size? rawSize,
   InputImageRotation? rotation,
+  bool swapLeftRight = false,
   double? fps,
   DateTime? timestamp,
 }) {
-  final leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
-  final rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
+  // A mirrored source buffer (the iOS front camera) reports ML Kit's
+  // left/right landmarks on the opposite sides from TrackingData's
+  // *unmirrored*, subject-relative convention (doc/DECISIONS.md #015):
+  // the subject's left eye ends up at a smaller x than their right, the
+  // reverse of the convention. [swapLeftRight] corrects the handedness by
+  // swapping which ML Kit landmark feeds `leftEye`/`rightEye` (and the
+  // ears) — a *relabeling*, not a coordinate change, so the eye midpoint
+  // (and thus overlay position) is untouched while the eye vector, and the
+  // overlay rotation derived from it, comes out right. Mirroring the
+  // coordinates instead would (correctly) fix rotation but shift the
+  // overlay to the mirrored x-position, since the renderer keeps preview
+  // and overlay in the same raw-buffer space and flips both together.
+  final leftEyeType =
+      swapLeftRight ? FaceLandmarkType.rightEye : FaceLandmarkType.leftEye;
+  final rightEyeType =
+      swapLeftRight ? FaceLandmarkType.leftEye : FaceLandmarkType.rightEye;
+  final leftEarType =
+      swapLeftRight ? FaceLandmarkType.rightEar : FaceLandmarkType.leftEar;
+  final rightEarType =
+      swapLeftRight ? FaceLandmarkType.leftEar : FaceLandmarkType.rightEar;
+
+  final leftEye = face.landmarks[leftEyeType]?.position;
+  final rightEye = face.landmarks[rightEyeType]?.position;
   if (leftEye == null || rightEye == null) return null;
   if (imageSize.width <= 0 || imageSize.height <= 0) return null;
 
@@ -79,8 +101,8 @@ TrackingData? mlKitFaceToTrackingData(
     rightEye: point(rightEye.x, rightEye.y),
     confidence: 1.0,
     nose: landmark(FaceLandmarkType.noseBase),
-    leftEar: landmark(FaceLandmarkType.leftEar),
-    rightEar: landmark(FaceLandmarkType.rightEar),
+    leftEar: landmark(leftEarType),
+    rightEar: landmark(rightEarType),
     fps: fps,
     timestamp: timestamp,
   );

@@ -672,29 +672,63 @@ detected face), it just won't request camera access there.
 
 # Decision 035
 
-## iOS live-stream rotation must combine sensorOrientation with the device's current orientation, not trust sensorOrientation alone
+## ML Kit live coordinates are already upright on iOS, raw on Android — rotate only Android
 
-Status: Accepted (0.1.2, post-M7)
+Status: Accepted (0.1.3, post-M7). Supersedes a wrong first diagnosis in
+0.1.2 (see below).
 
-`mlKitInputImageFromCameraImage`'s iOS branch used to compute
-`InputImageRotationValue.fromRawValue(sensorOrientation)` directly —
-the camera's fixed mount angle, with no reference to how the device is
-actually being held. The Android branch, by contrast, already combined
-`sensorOrientation` with `controller.value.deviceOrientation`. Both
-platforms now share one formula
-(`mlKitRotationForCamera`, `@visibleForTesting`).
+`IoVisionBackendEngine._onFrame` branches on platform when turning a
+detected `Face` into `TrackingData`:
 
-Reason: a real downstream bug, not a hypothetical one. Kalo Chasma (the
-donor app this package was extracted from) allows portrait and
-landscape in `Info.plist` — it isn't locked to one orientation. With the
-old iOS-only-sensorOrientation code, live face detections came back
-rotated ~90° from reality: landmark dots formed a vertical line down one
-side of the face instead of a horizontal line across the eyes,
-confirmed visually via `debugMode`'s eye-center/landmark markers on a
-real device. The `camera` plugin deliberately normalizes
-`sensorOrientation` and exposes `DeviceOrientation` identically on both
-platforms specifically so consuming code doesn't need to special-case
-per platform — the original asymmetric branching was the bug, not a
-necessary platform difference. Only correct if an app is locked to a
-single fixed orientation, which this package must not assume of every
-consumer.
+- **iOS**: call `mlKitFaceToTrackingData(face, rawSize)` — normalize the
+  detector's points directly against the raw buffer dimensions, apply
+  *no* rotation.
+- **Android**: call it with `rawSize` + `rotation` so `mlKitUprightPoint`
+  rotates the raw-sensor-space points upright, normalized against the
+  width/height-swapped upright size.
+
+Reason: a real device bug — on a live iOS camera the overlay's eyes/nose/
+chin stacked into a vertical line down one side of the face
+(`debugMode`-confirmed). The `camera` plugin delivers an
+*already-display-oriented* buffer on iOS, so ML Kit returns detections
+already upright; the code was then rotating them a second time via
+`mlKitUprightPoint`, turning a level face 90°. Google's own
+`packages/example/.../coordinates_translator.dart` encodes exactly this
+platform split: for a 90°/270° rotation it divides iOS points by the raw
+`imageSize` (no axis swap) but Android points by the swapped dimension —
+i.e. iOS points are already upright, Android's are not. The rotation
+handed to ML Kit stays asymmetric too (iOS = `sensorOrientation`;
+Android = combined with `deviceOrientation`), matching that same recipe.
+
+**Second, compounding iOS bug — mirrored handedness (also 0.1.3):** with
+the rotation corrected, eye-anchored overlays then rendered *upside down*.
+The iOS front-camera buffer is mirrored, so ML Kit reports the subject's
+left eye at a *smaller* x than their right — the reverse of
+`TrackingData`'s unmirrored, subject-left-on-frame's-right convention
+(#015). That reversed the eye vector `_EyeGeometry` derives head-roll
+from, flipping glasses 180°. The fix `swapLeftRight` *relabels* which ML
+Kit landmark feeds `leftEye`/`rightEye` (and the ears), it does **not**
+mirror the coordinates. This distinction is the crux: `VirtualTryOn`
+keeps the camera preview and the overlay `CustomPaint` as siblings inside
+one `Transform.flip` (#027) and mirrors both together, so the overlay's
+coordinates must stay in the same raw-buffer space as the preview to line
+up. Mirroring the overlay's x (the tempting fix) *does* correct rotation
+but shifts the overlay to the mirror-image x-position — visibly off to
+one side on an off-center face. Relabeling reverses the eye vector
+(fixing rotation) while leaving the eye midpoint — the overlay's anchor —
+exactly in place. (A false-start 0.1.3 build did mirror the coordinates
+and reproduced the off-to-one-side symptom on-device before this
+relabel-instead approach; verified via the same local `path:` dependency
+loop.)
+
+**Wrong first attempt (0.1.2), kept as a caution:** the initial fix
+instead unified the *rotation-metadata* computation to combine
+`sensorOrientation` with `deviceOrientation` on iOS as well, on the
+theory that ignoring device orientation was the bug. It wasn't — and the
+change was a no-op in portrait (portrait contributes 0° of compensation),
+which is precisely why the reported portrait misalignment survived it.
+The lesson: this was a *coordinate-space* bug (what space ML Kit reports
+in), not a *rotation-metadata* bug (what orientation ML Kit reads the
+buffer as). Verify a platform-specific CV fix on the actual platform
+before shipping — 0.1.3 was validated on-device against a local `path:`
+dependency before publishing.

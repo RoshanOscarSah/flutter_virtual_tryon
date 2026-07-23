@@ -8,24 +8,56 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.1.3 - 2026-07-23
+
+### Fixed
+
+- **Live face tracking was broken on the iOS front camera** — two
+  compounding coordinate bugs, both confirmed and fixed on a real device
+  via `debugMode`:
+  1. *Landmarks rotated ~90°* (eyes/nose/chin stacked into a vertical
+     line). The ML Kit conversion ran iOS detections through the
+     raw-sensor→upright rotation (`mlKitUprightPoint`), but on iOS the
+     `camera` plugin already delivers a display-oriented buffer, so ML Kit
+     returns coordinates *already upright* — rotating them again turned a
+     level face 90°. Per Google's own `coordinates_translator.dart`, iOS
+     points normalize directly against the raw image dimensions with no
+     rotation; Android points need the rotation. The live path now
+     branches on platform.
+  2. *Eye-anchored overlays rendered upside down (180°)* once the rotation
+     was fixed. The iOS front-camera buffer is mirrored, so ML Kit reports
+     the subject's left eye at a smaller x than their right — the reverse
+     of `TrackingData`'s unmirrored, subject-relative convention
+     (doc/DECISIONS.md #015) — which flipped the eye vector and rotated
+     glasses 180°. The iOS front-camera path now *relabels* ML Kit's
+     left/right landmarks (new `swapLeftRight` option on the internal
+     conversion) rather than flipping coordinates: the renderer keeps the
+     preview and overlay in one shared raw-buffer space and mirrors both
+     together, so flipping the overlay's coordinates would shift it
+     sideways off the face — whereas a relabel corrects the eye vector's
+     direction (fixing rotation) while leaving the eye midpoint, and thus
+     the overlay's position, exactly where it belongs.
+
+  Regression tests cover both: a level iOS face stays level (eyes share a
+  `y`, differ in `x`), and `swapLeftRight` restores subject-left-on-right
+  ordering with the eye midpoint unchanged. No public API changes —
+  internal backend fixes.
+
+  (Supersedes the 0.1.2 attempt, which changed the *rotation metadata*
+  computation — the wrong layer. That change was a no-op in portrait,
+  which is exactly why the reported portrait misalignment persisted.
+  0.1.3 reverts the iOS rotation-metadata computation to Google's recipe
+  and fixes the actual coordinate-space bug.)
+
 ## 0.1.2 - 2026-07-23
 
 ### Fixed
 
-- **Live face tracking was rotated ~90° on iOS whenever the app isn't
-  locked to a single device orientation.** The ML Kit live-stream path
-  computed the frame rotation from the camera's fixed sensor-mount angle
-  alone on iOS, never combining it with the device's *current*
-  orientation the way the Android path already correctly did. Apps that
-  allow portrait and landscape (rather than locking to one) got face
-  detections rotated relative to reality — visible as landmark dots
-  forming a vertical line down one side of the face instead of a
-  horizontal line across the eyes, confirmed via `debugMode`. Both
-  platforms now share one rotation formula
-  (`mlKitRotationForCamera`, `@visibleForTesting`), matching the design
-  intent of the `camera` plugin's own cross-platform `sensorOrientation`/
-  `DeviceOrientation` abstractions. 5 new regression tests. No public API
-  changes — this is an internal backend fix.
+- Attempted fix for iOS live-tracking rotation by combining
+  `sensorOrientation` with the device's current orientation on iOS.
+  **Ineffective** — see 0.1.3, which identifies and fixes the real cause
+  (the coordinate-space transform, not the rotation metadata). Kept in the
+  history for the record; upgrade straight to 0.1.3.
 
 ## 0.1.1 - 2026-07-23
 

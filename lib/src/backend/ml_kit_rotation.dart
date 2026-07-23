@@ -23,24 +23,35 @@ const _orientations = <DeviceOrientation, int>{
 };
 
 /// Computes the [InputImageRotation] ML Kit needs to interpret one raw
-/// sensor-space frame correctly, given the camera's fixed mount angle and
-/// the device's *current* orientation. Returns null for an orientation
-/// this recipe can't handle.
+/// camera frame correctly. Returns null for an orientation this recipe
+/// can't handle (Android only — an unknown [deviceOrientation]).
 ///
-/// Pulled out as a pure function (no [CameraImage]/[CameraController], so
-/// it's unit-testable without a real camera) after a real bug: an earlier
-/// version trusted [sensorOrientation] alone on iOS, without combining it
-/// with [deviceOrientation] the way the Android path already did. That's
-/// only correct for an app locked to one fixed orientation — anything
-/// that allows rotation (like Kalo Chasma's `Info.plist`, which permits
-/// portrait and landscape) got detections rotated ~90° from reality on
-/// iOS, while Android was fine. Both platforms now share one formula.
+/// Follows Google's own documented recipe exactly, which is deliberately
+/// *asymmetric* by platform — not a bug, a real platform difference:
+///
+///  - **iOS**: the `camera` plugin delivers frames already rotated to the
+///    display orientation, so the fixed [sensorOrientation] alone tells ML
+///    Kit which way is up. (A consequence, handled in ml_kit_conversion.dart:
+///    iOS detections come back *already upright*, so they must NOT be run
+///    through [mlKitUprightPoint].)
+///  - **Android**: frames arrive in the raw sensor buffer orientation, so
+///    the rotation combines [sensorOrientation] with the device's current
+///    [deviceOrientation] (sign depending on front/back lens), and the
+///    returned coordinates are in raw buffer space (rotated upright by
+///    [mlKitUprightPoint]).
+///
+/// Pulled out as a pure function (no [CameraImage]/[CameraController]) so
+/// it's unit-testable without a real camera.
 @visibleForTesting
 InputImageRotation? mlKitRotationForCamera({
+  required TargetPlatform platform,
   required int sensorOrientation,
   required CameraLensDirection lensDirection,
   required DeviceOrientation? deviceOrientation,
 }) {
+  if (platform == TargetPlatform.iOS) {
+    return InputImageRotationValue.fromRawValue(sensorOrientation);
+  }
   final rotationCompensation = _orientations[deviceOrientation];
   if (rotationCompensation == null) return null;
   final combined = lensDirection == CameraLensDirection.front
@@ -59,6 +70,7 @@ InputImage? mlKitInputImageFromCameraImage(
 ) {
   final camera = controller.description;
   final rotation = mlKitRotationForCamera(
+    platform: defaultTargetPlatform,
     sensorOrientation: camera.sensorOrientation,
     lensDirection: camera.lensDirection,
     deviceOrientation: controller.value.deviceOrientation,

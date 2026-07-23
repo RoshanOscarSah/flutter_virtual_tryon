@@ -121,19 +121,50 @@ final class IoVisionBackendEngine implements VisionBackendEngine {
       final face = pickPrimaryFace(faces);
       final rawSize = ui.Size(image.width.toDouble(), image.height.toDouble());
       final rotation = input.metadata!.rotation;
-      final uprightSize = mlKitUprightSize(rawSize, rotation);
       final now = DateTime.now();
       final fps = _fpsTracker.tick(now);
-      final data = face == null
-          ? null
-          : mlKitFaceToTrackingData(
-              face,
-              uprightSize,
-              rawSize: rawSize,
-              rotation: rotation,
-              fps: fps,
-              timestamp: now,
-            );
+      // Platform-split coordinate handling — the crux of getting live
+      // landmarks upright (see ml_kit_rotation.dart's recipe note and
+      // google_ml_kit's own coordinates_translator.dart):
+      //
+      //  - iOS: the plugin hands ML Kit an already-display-oriented buffer,
+      //    so detections come back upright, in the raw buffer's own
+      //    dimensions. Normalize against rawSize and apply NO rotation —
+      //    running these through mlKitUprightPoint would rotate an
+      //    already-upright face another 90°, stacking the eyes/nose/chin
+      //    into a vertical line. The front-camera buffer is also mirrored,
+      //    so swapLeftRight relabels ML Kit's left/right landmarks into
+      //    TrackingData's unmirrored convention (else eye-anchored overlays
+      //    render 180° / upside down — see mlKitFaceToTrackingData's
+      //    swapLeftRight note). It's a relabel, not a coordinate flip, so
+      //    the overlay stays on the face (a coordinate flip would mirror
+      //    its x-position, since the renderer flips preview + overlay
+      //    together in the same raw-buffer space).
+      //  - Android: detections are in the raw sensor buffer's space, so
+      //    rotate them upright (mlKitUprightPoint, via rawSize+rotation) and
+      //    normalize against the width/height-swapped upright size.
+      final TrackingData? data;
+      if (face == null) {
+        data = null;
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        data = mlKitFaceToTrackingData(
+          face,
+          rawSize,
+          swapLeftRight:
+              controller.description.lensDirection == CameraLensDirection.front,
+          fps: fps,
+          timestamp: now,
+        );
+      } else {
+        data = mlKitFaceToTrackingData(
+          face,
+          mlKitUprightSize(rawSize, rotation),
+          rawSize: rawSize,
+          rotation: rotation,
+          fps: fps,
+          timestamp: now,
+        );
+      }
       _tracking.add(data);
     } catch (_) {
       // A dropped/malformed frame is not worth surfacing — the next one

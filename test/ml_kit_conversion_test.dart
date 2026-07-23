@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter/services.dart' show DeviceOrientation;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -220,20 +221,38 @@ void main() {
   });
 
   group('mlKitRotationForCamera', () {
-    // Regression test for a real bug: an earlier version used
-    // InputImageRotationValue.fromRawValue(sensorOrientation) directly on
-    // iOS, completely ignoring the device's current orientation — correct
-    // only for an app locked to one fixed orientation. Kalo Chasma's
-    // Info.plist allows portrait and landscape, so live detections came
-    // back rotated ~90° from reality on iOS (confirmed via the package's
-    // own debugMode overlay: landmark dots formed a vertical line instead
-    // of a horizontal one across the eyes). The fix: both platforms now
-    // share the same sensorOrientation + deviceOrientation combination
-    // the Android path already used correctly.
+    // The rotation ML Kit is handed follows Google's own recipe, which is
+    // deliberately asymmetric by platform (see the function's own doc): iOS
+    // uses the fixed sensorOrientation because the plugin delivers
+    // display-oriented frames; Android combines sensorOrientation with the
+    // live deviceOrientation because its frames are raw-sensor-oriented.
 
-    test('returns null for an unrecognized/null device orientation', () {
+    test('iOS ignores deviceOrientation and uses sensorOrientation directly',
+        () {
+      // Same sensorOrientation -> same rotation regardless of how the
+      // device is held (the plugin already oriented the buffer).
+      for (final orientation in [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        null,
+      ]) {
+        expect(
+          mlKitRotationForCamera(
+            platform: TargetPlatform.iOS,
+            sensorOrientation: 90,
+            lensDirection: CameraLensDirection.front,
+            deviceOrientation: orientation,
+          ),
+          InputImageRotation.rotation90deg,
+        );
+      }
+    });
+
+    test('Android returns null for an unrecognized/null device orientation',
+        () {
       expect(
         mlKitRotationForCamera(
+          platform: TargetPlatform.android,
           sensorOrientation: 270,
           lensDirection: CameraLensDirection.front,
           deviceOrientation: null,
@@ -242,33 +261,11 @@ void main() {
       );
     });
 
-    test(
-      'front camera: the same sensorOrientation produces different '
-      'rotations for different device orientations (this is exactly what '
-      'the buggy iOS-only-sensorOrientation code failed to do)',
-      () {
-        const sensorOrientation = 270; // typical iPhone front camera
-        final rotations = {
-          for (final orientation in DeviceOrientation.values)
-            orientation: mlKitRotationForCamera(
-              sensorOrientation: sensorOrientation,
-              lensDirection: CameraLensDirection.front,
-              deviceOrientation: orientation,
-            ),
-        };
-        // All four must be non-null and pairwise distinct — proving the
-        // result actually depends on deviceOrientation, not just a fixed
-        // sensorOrientation.
-        expect(rotations.values, everyElement(isNotNull));
-        expect(rotations.values.toSet().length, 4);
-      },
-    );
-
-    test('front camera: (sensorOrientation + deviceOrientation) % 360', () {
-      // portraitUp contributes 0 degrees, so the raw value is
-      // sensorOrientation unchanged.
+    test('Android front camera: (sensorOrientation + deviceOrientation) % 360',
+        () {
       expect(
         mlKitRotationForCamera(
+          platform: TargetPlatform.android,
           sensorOrientation: 270,
           lensDirection: CameraLensDirection.front,
           deviceOrientation: DeviceOrientation.portraitUp,
@@ -278,6 +275,7 @@ void main() {
       // landscapeLeft contributes 90 degrees: (270 + 90) % 360 = 0.
       expect(
         mlKitRotationForCamera(
+          platform: TargetPlatform.android,
           sensorOrientation: 270,
           lensDirection: CameraLensDirection.front,
           deviceOrientation: DeviceOrientation.landscapeLeft,
@@ -286,12 +284,12 @@ void main() {
       );
     });
 
-    test('back camera: (sensorOrientation - deviceOrientation + 360) % 360',
-        () {
-      // portraitUp contributes 0 degrees, so the raw value is
-      // sensorOrientation unchanged.
+    test(
+        'Android back camera: '
+        '(sensorOrientation - deviceOrientation + 360) % 360', () {
       expect(
         mlKitRotationForCamera(
+          platform: TargetPlatform.android,
           sensorOrientation: 90,
           lensDirection: CameraLensDirection.back,
           deviceOrientation: DeviceOrientation.portraitUp,
@@ -301,6 +299,7 @@ void main() {
       // landscapeLeft contributes 90 degrees: (90 - 90 + 360) % 360 = 0.
       expect(
         mlKitRotationForCamera(
+          platform: TargetPlatform.android,
           sensorOrientation: 90,
           lensDirection: CameraLensDirection.back,
           deviceOrientation: DeviceOrientation.landscapeLeft,
@@ -308,22 +307,89 @@ void main() {
         InputImageRotation.rotation0deg,
       );
     });
+  });
 
-    test('front and back cameras rotate oppositely for the same turn', () {
-      // Mirrored front-facing sensors need the opposite sign convention
-      // from a rear sensor for the same physical device rotation.
-      const sensorOrientation = 90;
-      final front = mlKitRotationForCamera(
-        sensorOrientation: sensorOrientation,
-        lensDirection: CameraLensDirection.front,
-        deviceOrientation: DeviceOrientation.landscapeLeft,
+  group('mlKitFaceToTrackingData — iOS coordinate handling (regression)', () {
+    // Regression for the real bug behind vertically-stacked landmarks on a
+    // live iOS camera. ML Kit on iOS returns detections already in the
+    // display-upright orientation (the plugin delivers an oriented buffer,
+    // and google_ml_kit's own coordinates_translator.dart normalizes iOS
+    // points against the raw image dimensions with no rotation). Running
+    // those already-upright points through mlKitUprightPoint — as the code
+    // wrongly did on iOS — rotated them another 90°, stacking eyes/nose/
+    // chin into a vertical line. The fix: iOS calls this function with just
+    // (face, rawSize) — no rawSize+rotation pair — so no rotation is applied.
+
+    test(
+        'iOS path (no rotation args) normalizes raw points directly, '
+        'leaving a level face level', () {
+      // Eyes side by side on a level face, in the already-upright iOS
+      // buffer's own pixel space.
+      final face = _face(
+        boundingBox: const Rect.fromLTWH(200, 150, 400, 300),
+        leftEye: const Point(560, 300),
+        rightEye: const Point(360, 300),
       );
-      final back = mlKitRotationForCamera(
-        sensorOrientation: sensorOrientation,
-        lensDirection: CameraLensDirection.back,
-        deviceOrientation: DeviceOrientation.landscapeLeft,
+      const iosBufferSize = Size(800, 600);
+      final data = mlKitFaceToTrackingData(face, iosBufferSize)!;
+
+      // Direct normalization, no rotation: x/800, y/600.
+      expect(data.leftEye, const Offset(0.7, 0.5));
+      expect(data.rightEye, const Offset(0.45, 0.5));
+      // The eyes share a y — a level face stays level (the exact symptom
+      // that broke: they must NOT end up stacked at one x).
+      expect(data.leftEye.dy, data.rightEye.dy);
+      expect(data.leftEye.dx, isNot(data.rightEye.dx));
+    });
+
+    test(
+        'swapLeftRight relabels eyes into the subject-left-on-right '
+        'convention WITHOUT moving them — fixing 180°/upside-down overlays '
+        'on the iOS front camera while keeping position correct', () {
+      // The iOS front-camera buffer is mirrored, so ML Kit reports the
+      // subject's left eye at a SMALLER x than their right — the reverse of
+      // TrackingData's contract (doc/DECISIONS.md #015). Without the swap
+      // the eye vector points the wrong way and eye-anchored overlays
+      // rotate 180° (the reported upside-down glasses).
+      final mirroredFace = _face(
+        boundingBox: const Rect.fromLTWH(200, 150, 400, 300),
+        leftEye: const Point(360, 300), // ML Kit's "left" at the SMALLER x
+        rightEye: const Point(560, 300),
+        leftEar: const Point(300, 310),
+        rightEar: const Point(620, 310),
       );
-      expect(front, isNot(back));
+      const iosBufferSize = Size(800, 600);
+
+      final plain = mlKitFaceToTrackingData(mirroredFace, iosBufferSize)!;
+      final swapped = mlKitFaceToTrackingData(
+        mirroredFace,
+        iosBufferSize,
+        swapLeftRight: true,
+      )!;
+
+      // Coordinates are NOT flipped: the two eye points stay put, they're
+      // just relabeled. So the eye MIDPOINT (= overlay anchor) is identical
+      // with or without the swap — the overlay doesn't move sideways.
+      expect(
+        Offset(
+          (swapped.leftEye.dx + swapped.rightEye.dx) / 2,
+          (swapped.leftEye.dy + swapped.rightEye.dy) / 2,
+        ),
+        Offset(
+          (plain.leftEye.dx + plain.rightEye.dx) / 2,
+          (plain.leftEye.dy + plain.rightEye.dy) / 2,
+        ),
+      );
+
+      // But left/right are now swapped: TrackingData.leftEye takes the
+      // LARGER x (ML Kit's rightEye), satisfying the convention, so the
+      // rightEye -> leftEye vector points +x (level, upright) not reversed.
+      expect(swapped.leftEye, plain.rightEye);
+      expect(swapped.rightEye, plain.leftEye);
+      expect(swapped.leftEye.dx, greaterThan(swapped.rightEye.dx));
+      // Ears swap too, for consistent subject-relative labeling.
+      expect(swapped.leftEar, plain.rightEar);
+      expect(swapped.rightEar, plain.leftEar);
     });
   });
 
