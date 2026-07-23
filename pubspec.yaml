@@ -1,0 +1,42 @@
+name: flutter_virtual_tryon
+description: >-
+  A cross-platform face tracking and overlay engine for Flutter — the
+  reusable core behind virtual try-on experiences for glasses, sunglasses,
+  contact lenses, and custom overlays.
+version: 0.1.0
+homepage: https://github.com/RoshanOscarSah/flutter_virtual_tryon
+repository: https://github.com/RoshanOscarSah/flutter_virtual_tryon
+issue_tracker: https://github.com/RoshanOscarSah/flutter_virtual_tryon/issues
+
+# Broad compatibility floor, not the pinned toolchain version — this is a
+# public package, not an app; avoid excluding developers on older stable
+# Flutter/Dart. Raised from 3.0.0 to 3.3.0 in M2: the web vision backend's
+# JS interop (web_bridge.dart) uses extension types, a Dart 3.3 feature —
+# see doc/DECISIONS.md #023. Flutter 3.19 is the first stable release
+# bundling Dart 3.3.
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Camera lifecycle (open/close, live image stream, still capture) shared
+  # by every platform that has one. Versions match what's proven in
+  # production (see doc/HANDOVER.md).
+  camera: ^0.11.1
+  # Android/iOS vision backend.
+  google_mlkit_face_detection: ^0.13.2
+  # ML Kit's file-path-only detection API needs a scratch file per still
+  # detection (see ml_kit_backend.dart).
+  path_provider: ^2.1.5
+  # dart:js_interop typings for the web vision backend.
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:

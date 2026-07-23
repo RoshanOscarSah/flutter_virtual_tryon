@@ -1,0 +1,17 @@
+include: package:flutter_lints/flutter.yaml
+
+# This is a public package (doc/CODING_STANDARDS.md: "Every public API must
+# include Dart documentation"). Enforce it with the analyzer rather than
+# relying on review discipline alone.
+linter:
+  rules:
+    - public_member_api_docs
+    - package_api_docs
+    - always_declare_return_types
+    - avoid_print
+    - prefer_relative_imports
+    - unawaited_futures
+
+analyzer:
+  exclude:
+    - example/**
