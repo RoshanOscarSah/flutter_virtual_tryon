@@ -3,7 +3,7 @@ description: >-
   A cross-platform face tracking and overlay engine for Flutter — the
   reusable core behind virtual try-on experiences for glasses, sunglasses,
   contact lenses, and custom overlays.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/RoshanOscarSah/flutter_virtual_tryon
 repository: https://github.com/RoshanOscarSah/flutter_virtual_tryon
 issue_tracker: https://github.com/RoshanOscarSah/flutter_virtual_tryon/issues
@@ -23,11 +23,10 @@ dependencies:
     sdk: flutter
 
   # Camera lifecycle (open/close, live image stream, still capture) shared
-  # by every platform that has one. Versions match what's proven in
-  # production (see doc/HANDOVER.md).
-  camera: ^0.11.1
+  # by every platform that has one.
+  camera: ^0.12.0
   # Android/iOS vision backend.
-  google_mlkit_face_detection: ^0.13.2
+  google_mlkit_face_detection: ^0.14.0
   # ML Kit's file-path-only detection API needs a scratch file per still
   # detection (see ml_kit_backend.dart).
   path_provider: ^2.1.5

@@ -8,6 +8,25 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.1.1 - 2026-07-23
+
+### Changed
+
+- Raised the `camera` dependency floor from `^0.11.1` to `^0.12.0` and
+  `google_mlkit_face_detection` from `^0.13.2` to `^0.14.0`, closing the
+  gap to their latest stable releases (pub.dev's "up-to-date dependencies"
+  score). Neither bump changes any public Dart API this package uses —
+  `camera` 0.12.0's only relevant change is a dispose-safety bugfix;
+  `google_mlkit_face_detection` 0.14.0 and its `google_mlkit_commons`
+  0.12.0 dependency are native-implementation rewrites (Java→Kotlin,
+  Objective-C→Swift) with no listed Dart-level signature changes.
+  Verified via `flutter analyze` and the full test suite (132 tests) on
+  both the package and example — live-camera behavior on a real
+  Android/iOS device has not been separately re-verified against the new
+  versions; flag this milestone's finding if `google_mlkit_commons`'s
+  "enhanced image format validation" turns out to reject frames it
+  previously accepted.
+
 ## 0.1.0 - 2026-07-23
 
 ### Added
