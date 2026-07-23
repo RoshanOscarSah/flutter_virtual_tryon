@@ -216,3 +216,45 @@ and additions were fixed during implementation and are part of the contract.
 - **`package:flutter_virtual_tryon/testing.dart`** — exports
   `MockVisionBackend` so apps can widget-test try-on flows with no
   camera. Part of the supported public surface.
+
+---
+
+# Still-image try-on (0.2.0)
+
+```dart
+VirtualTryOnImage(
+  imageBytes: photoBytes,          // required Uint8List (encoded JPEG/PNG)
+
+  overlays: [
+    GlassesOverlay(image: AssetImage('assets/rayban.png')),
+  ],
+
+  backend: VisionBackend.auto(),   // optional; same backends as VirtualTryOn
+  mirror: false,                   // optional; photos aren't selfie-mirrored
+
+  loadingBuilder: (context) {},    // optional; while detection runs
+  noFaceBuilder: (context) {},     // optional; when no face is found
+  onFaceDetected: (tracking) {},   // optional
+  onError: (error) {},             // optional
+)
+```
+
+The still-photo sibling of `VirtualTryOn`. Detects a face **once** in the
+supplied photo and paints the same `FaceOverlay`s over it, for a gallery
+pick or a captured image rather than a live camera.
+
+- **`imageBytes` is a `Uint8List`** of the *encoded* photo (JPEG/PNG) —
+  what `image_picker`, `File.readAsBytes`, and `rootBundle.load` return.
+  Encoded bytes rather than an `ImageProvider` because detection needs
+  them (ML Kit reads a file, MediaPipe a blob). Convenience
+  `ImageProvider`-based constructors may be added later without a breaking
+  change.
+- **Sizes itself to the photo.** The image and overlays render inside an
+  `AspectRatio` locked to the photo's own dimensions; place the widget in a
+  bounded box (`Expanded`, `Center`, a sized parent) like any
+  `AspectRatio`.
+- **`mirror` defaults to `false`** (a saved photo isn't mirrored like a
+  live selfie preview). A photo that *was* stored mirrored may place
+  overlays as a mirror image.
+- Same `VisionBackend` / `VisionBackendException` / `TrackingData` types as
+  the live widget; `MockVisionBackend(stillResult: ...)` drives it in tests.

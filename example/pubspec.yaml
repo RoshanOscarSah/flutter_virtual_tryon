@@ -34,6 +34,10 @@ dependencies:
   flutter_virtual_tryon:
     path: ../
 
+  # Example-only: lets the photo demo pick an image from the gallery to feed
+  # into VirtualTryOnImage. Not a dependency of the package itself.
+  image_picker: ^1.1.2
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8

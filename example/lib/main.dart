@@ -4,6 +4,7 @@ import 'demos/calibration_demo.dart';
 import 'demos/custom_overlay_demo.dart';
 import 'demos/debug_mode_demo.dart';
 import 'demos/optical_shop_demo.dart';
+import 'demos/photo_demo.dart';
 import 'demos/quick_start_demo.dart';
 
 void main() {
@@ -61,6 +62,11 @@ final _demos = [
     'Calibration',
     'Tune placement live, export ready-to-paste code',
     (_) => const CalibrationDemo(),
+  ),
+  _Demo(
+    'Photo Try-On',
+    'Place frames on a gallery photo (no live camera)',
+    (_) => const PhotoDemo(),
   ),
 ];
 

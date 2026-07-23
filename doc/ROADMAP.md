@@ -204,6 +204,12 @@ Release Version:
 
 ---
 
+# Post-1.0 / delivered beyond 0.1.0
+
+- **Still-image (photo) try-on** — delivered in 0.2.0 via
+  `VirtualTryOnImage` (detect once on a supplied photo, paint overlays
+  over it). Restores gallery/photo try-on that live-only 0.1.x lacked.
+
 # Long-Term Vision
 
 Future versions may include:

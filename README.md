@@ -85,6 +85,26 @@ VirtualTryOn(controller: controller, overlays: [...]);
 final shot = await controller.capture(); // TryOnCapture? — PNG + dimensions
 ```
 
+## Photo / still-image try-on
+
+Try frames on a **static photo** (a gallery pick or captured image) instead
+of the live camera with `VirtualTryOnImage`:
+
+```dart
+VirtualTryOnImage(
+  imageBytes: await pickedFile.readAsBytes(), // Uint8List of the encoded photo
+  overlays: [GlassesOverlay(image: AssetImage('assets/rayban.png'))],
+  noFaceBuilder: (context) => const Text('No face found — try another photo'),
+)
+```
+
+It detects a face once, then paints the same overlays over the photo. Takes
+the **encoded bytes** (`Uint8List` — what `image_picker`/`File.readAsBytes`/
+`rootBundle.load` give you) because face detection needs them, and sizes
+itself to the photo's aspect ratio (place it in an `Expanded`/`Center`/sized
+box). `mirror` defaults to `false` since a saved photo isn't selfie-mirrored.
+See [`example/lib/demos/photo_demo.dart`](example/lib/demos/photo_demo.dart).
+
 ## Built-in overlays
 
 - **`GlassesOverlay`** / **`SunglassesOverlay`** — an `ImageProvider`

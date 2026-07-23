@@ -8,6 +8,29 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.2.0 - 2026-07-23
+
+### Added
+
+- **`VirtualTryOnImage`** — still-photo try-on. Detects a face once in a
+  supplied photo and paints the same `FaceOverlay`s over it, for a gallery
+  pick or captured image rather than the live camera. Takes the encoded
+  photo as a `Uint8List` (`image_picker`/`File.readAsBytes`/`rootBundle.load`
+  all return this — detection needs the encoded bytes), sizes itself to the
+  photo's aspect ratio, and offers `loadingBuilder`/`noFaceBuilder` slots
+  plus `onFaceDetected`/`onError`. Shares the exact overlay paint pipeline
+  with the live `VirtualTryOn` (see doc/DECISIONS.md #036).
+  `MockVisionBackend(stillResult: ...)` drives it in tests. The detection
+  engine already supported stills on every backend (`detectStill`); this
+  exposes it publicly.
+- Example: a "Photo Try-On" demo (`example/lib/demos/photo_demo.dart`) that
+  gallery-picks an image (`image_picker`, example-only dep) and runs
+  `VirtualTryOnImage`.
+
+Additive only — no changes to existing public API. Internally, the overlay
+`CustomPainter`s were extracted to a shared `renderer/overlays_painter.dart`
+so both widgets use one pipeline (no behavior change).
+
 ## 0.1.3 - 2026-07-23
 
 ### Fixed

@@ -732,3 +732,42 @@ in), not a *rotation-metadata* bug (what orientation ML Kit reads the
 buffer as). Verify a platform-specific CV fix on the actual platform
 before shipping — 0.1.3 was validated on-device against a local `path:`
 dependency before publishing.
+
+---
+
+# Decision 036
+
+## Still-image try-on takes encoded bytes and sizes to an aspect-ratio box
+
+Status: Accepted (0.2.0)
+
+`VirtualTryOnImage` (the still-photo sibling of `VirtualTryOn`) takes the
+photo as a `Uint8List` of *encoded* bytes, and renders the photo + overlays
+inside an `AspectRatio` locked to the image's own pixel dimensions.
+
+Reason (bytes, not `ImageProvider`): detection genuinely needs the encoded
+image — `detectStill` feeds ML Kit a real file path on iOS/Android and
+MediaPipe a blob on web; neither can consume a decoded `ui.Image`. A
+`Uint8List` is also exactly what every realistic source hands you
+(`image_picker`'s `XFile.readAsBytes`, `File.readAsBytes`,
+`rootBundle.load`). Taking an `ImageProvider` would be more Flutter-idiomatic
+but couldn't reliably recover encoded bytes for detection (an `AssetImage`/
+`NetworkImage` only exposes a decoded image), so it would be a lie for the
+general case. Convenience `.asset`/`.file`/`.network` constructors that
+resolve to bytes can be added later without breaking the bytes API.
+
+Reason (aspect-ratio box, not letterbox mapping): the overlays' normalized
+`TrackingData` coordinates map to the paint `size` by a plain multiply
+(`FaceOverlayPaintContext.size`). If the photo were shown with
+`BoxFit.contain` inside an arbitrary box, the displayed image would occupy a
+letterboxed sub-rect and the overlays would need that rect's offset/scale
+applied — reintroducing exactly the `_BoxFitTransform` mapping the donor app
+carried. Locking the whole unit to the image's aspect ratio (image at
+`BoxFit.fill`, box AR == image AR, so no distortion) keeps the coordinate
+mapping linear and identical to the live widget's, and defers fitting-into-
+the-layout to the standard `AspectRatio` the consumer already knows.
+
+`mirror` defaults to `false` here (a saved photo isn't selfie-mirrored like
+a live preview), and no `swapLeftRight` is applied — a normal photo already
+matches the unmirrored, subject-left-on-frame's-right convention (#015). A
+photo that *was* stored mirrored is a documented edge case that may misalign.

@@ -16,8 +16,8 @@ import '../models/tracking_state.dart';
 import '../models/try_on_capture.dart';
 import '../models/try_on_error.dart';
 import '../overlays/face_overlay.dart';
-import '../renderer/debug_overlay_painter.dart';
 import '../renderer/overlay_image_resolver.dart';
+import '../renderer/overlays_painter.dart';
 import '../tracking/tracking_smoother.dart';
 
 /// Imperative handle for a [VirtualTryOn] widget: capture and state
@@ -387,7 +387,7 @@ class _VirtualTryOnState extends State<VirtualTryOn>
               content,
               if (instruction != null)
                 CustomPaint(
-                  painter: _OverlaysPainter(
+                  painter: OverlaysPainter(
                     overlays: widget.overlays,
                     data: instruction.$1,
                     opacity: instruction.$2,
@@ -406,7 +406,7 @@ class _VirtualTryOnState extends State<VirtualTryOn>
                   // — correct alignment is the point of a debugging aid.
                   // Trade-off: the text panel (FPS/rotation/scale/
                   // confidence) reads mirrored too when `mirror` is on.
-                  painter: _DebugPainter(
+                  painter: DebugPainter(
                     options: widget.debugOptions,
                     tracking: _trackingState == TrackingState.tracking
                         ? _lastData
@@ -419,66 +419,4 @@ class _VirtualTryOnState extends State<VirtualTryOn>
       ),
     );
   }
-}
-
-class _OverlaysPainter extends CustomPainter {
-  _OverlaysPainter({
-    required this.overlays,
-    required this.data,
-    required this.opacity,
-    required this.mirrored,
-    required this.images,
-    required this.imageConfiguration,
-  });
-
-  final List<FaceOverlay> overlays;
-  final TrackingData data;
-  final double opacity;
-  final bool mirrored;
-  final OverlayImageResolver images;
-  final ImageConfiguration imageConfiguration;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final context = FaceOverlayPaintContext(
-      canvas: canvas,
-      size: size,
-      tracking: data,
-      opacity: opacity,
-      mirrored: mirrored,
-      images: images,
-      imageConfiguration: imageConfiguration,
-    );
-    for (final overlay in overlays) {
-      final constraints = overlay.visibleWhen;
-      if (constraints != null &&
-          !constraints.isSatisfiedBy(data, viewSize: size)) {
-        continue;
-      }
-      overlay.paint(context);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_OverlaysPainter oldDelegate) =>
-      oldDelegate.data != data ||
-      oldDelegate.opacity != opacity ||
-      oldDelegate.mirrored != mirrored ||
-      oldDelegate.overlays != overlays ||
-      oldDelegate.images != images;
-}
-
-class _DebugPainter extends CustomPainter {
-  _DebugPainter({required this.options, required this.tracking});
-
-  final DebugOptions options;
-  final TrackingData? tracking;
-
-  @override
-  void paint(Canvas canvas, Size size) =>
-      paintDebugOverlay(canvas, size, options: options, tracking: tracking);
-
-  @override
-  bool shouldRepaint(_DebugPainter oldDelegate) =>
-      oldDelegate.options != options || oldDelegate.tracking != tracking;
 }

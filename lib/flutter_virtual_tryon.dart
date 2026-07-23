@@ -34,3 +34,4 @@ export 'src/overlays/glasses_overlay.dart';
 export 'src/overlays/sunglasses_overlay.dart';
 export 'src/widgets/overlay_calibrator.dart';
 export 'src/widgets/virtual_try_on.dart';
+export 'src/widgets/virtual_try_on_image.dart';

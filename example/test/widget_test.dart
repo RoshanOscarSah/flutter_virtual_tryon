@@ -16,6 +16,7 @@ void main() {
     expect(find.text('Custom Overlay'), findsOneWidget);
     expect(find.text('Debug Mode'), findsOneWidget);
     expect(find.text('Calibration'), findsOneWidget);
+    expect(find.text('Photo Try-On'), findsOneWidget);
   });
 
   testWidgets('tapping a demo navigates to its screen', (
