@@ -18,11 +18,12 @@ MIT
 
 Current Version
 
-0.1.0 (Development)
+0.1.1 (Published — pub.dev/packages/flutter_virtual_tryon)
 
 Repository Status
 
-Architecture Phase
+Published to pub.dev and GitHub
+(github.com/RoshanOscarSah/flutter_virtual_tryon)
 
 ---
 
@@ -213,11 +214,19 @@ Avoid breaking changes.
   runtime-type change, smoothTracking toggle, init failure). Overall
   coverage rose from 77.0% to 83.4%; every source file is now at 100%
   except the three that require real camera/ML Kit hardware
-  (documented in doc/TESTING.md "Current Coverage"). `dart pub publish
-  --dry-run` passes cleanly. Actual `dart pub publish` (the real,
-  non-dry-run release) deliberately not run — it's a one-way action
-  needing pub.dev credentials and, per pubspec.yaml's own TODO, the
-  package hasn't been split into its own GitHub repo yet.
+  (documented in doc/TESTING.md "Current Coverage"). The package was
+  split into its own repo (github.com/RoshanOscarSah/flutter_virtual_tryon)
+  and **published to pub.dev as 0.1.0** — the first real release.
+
+- **0.1.1** (2026-07-23): dependency-only patch — `camera` raised to
+  `^0.12.0` and `google_mlkit_face_detection` to `^0.14.0`, closing the
+  gap to their latest stable versions for pub.dev's "up-to-date
+  dependencies" score (30/40 → targeting 40/40). No public API changes;
+  no Dart-level breaking changes in either dependency, verified via
+  analyze + the full test suite. Live-camera behavior on a real device
+  against the new versions has not been separately re-verified — flag
+  if `google_mlkit_commons` 0.12.0's "enhanced image format validation"
+  turns out to reject frames the old version accepted.
 
 132 total tests pass, including genuine (non-golden-file) pixel-level
 render tests for GlassesOverlay, ContactLensOverlay, and the debug
