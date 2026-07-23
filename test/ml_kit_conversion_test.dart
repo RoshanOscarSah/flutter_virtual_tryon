@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:camera/camera.dart';
+import 'package:flutter/services.dart' show DeviceOrientation;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:flutter_virtual_tryon/src/backend/ml_kit_conversion.dart';
@@ -214,6 +216,114 @@ void main() {
       );
       final withoutRotation = mlKitFaceToTrackingData(face, imageSize);
       expect(withRotation, withoutRotation);
+    });
+  });
+
+  group('mlKitRotationForCamera', () {
+    // Regression test for a real bug: an earlier version used
+    // InputImageRotationValue.fromRawValue(sensorOrientation) directly on
+    // iOS, completely ignoring the device's current orientation — correct
+    // only for an app locked to one fixed orientation. Kalo Chasma's
+    // Info.plist allows portrait and landscape, so live detections came
+    // back rotated ~90° from reality on iOS (confirmed via the package's
+    // own debugMode overlay: landmark dots formed a vertical line instead
+    // of a horizontal one across the eyes). The fix: both platforms now
+    // share the same sensorOrientation + deviceOrientation combination
+    // the Android path already used correctly.
+
+    test('returns null for an unrecognized/null device orientation', () {
+      expect(
+        mlKitRotationForCamera(
+          sensorOrientation: 270,
+          lensDirection: CameraLensDirection.front,
+          deviceOrientation: null,
+        ),
+        isNull,
+      );
+    });
+
+    test(
+      'front camera: the same sensorOrientation produces different '
+      'rotations for different device orientations (this is exactly what '
+      'the buggy iOS-only-sensorOrientation code failed to do)',
+      () {
+        const sensorOrientation = 270; // typical iPhone front camera
+        final rotations = {
+          for (final orientation in DeviceOrientation.values)
+            orientation: mlKitRotationForCamera(
+              sensorOrientation: sensorOrientation,
+              lensDirection: CameraLensDirection.front,
+              deviceOrientation: orientation,
+            ),
+        };
+        // All four must be non-null and pairwise distinct — proving the
+        // result actually depends on deviceOrientation, not just a fixed
+        // sensorOrientation.
+        expect(rotations.values, everyElement(isNotNull));
+        expect(rotations.values.toSet().length, 4);
+      },
+    );
+
+    test('front camera: (sensorOrientation + deviceOrientation) % 360', () {
+      // portraitUp contributes 0 degrees, so the raw value is
+      // sensorOrientation unchanged.
+      expect(
+        mlKitRotationForCamera(
+          sensorOrientation: 270,
+          lensDirection: CameraLensDirection.front,
+          deviceOrientation: DeviceOrientation.portraitUp,
+        ),
+        InputImageRotation.rotation270deg,
+      );
+      // landscapeLeft contributes 90 degrees: (270 + 90) % 360 = 0.
+      expect(
+        mlKitRotationForCamera(
+          sensorOrientation: 270,
+          lensDirection: CameraLensDirection.front,
+          deviceOrientation: DeviceOrientation.landscapeLeft,
+        ),
+        InputImageRotation.rotation0deg,
+      );
+    });
+
+    test('back camera: (sensorOrientation - deviceOrientation + 360) % 360',
+        () {
+      // portraitUp contributes 0 degrees, so the raw value is
+      // sensorOrientation unchanged.
+      expect(
+        mlKitRotationForCamera(
+          sensorOrientation: 90,
+          lensDirection: CameraLensDirection.back,
+          deviceOrientation: DeviceOrientation.portraitUp,
+        ),
+        InputImageRotation.rotation90deg,
+      );
+      // landscapeLeft contributes 90 degrees: (90 - 90 + 360) % 360 = 0.
+      expect(
+        mlKitRotationForCamera(
+          sensorOrientation: 90,
+          lensDirection: CameraLensDirection.back,
+          deviceOrientation: DeviceOrientation.landscapeLeft,
+        ),
+        InputImageRotation.rotation0deg,
+      );
+    });
+
+    test('front and back cameras rotate oppositely for the same turn', () {
+      // Mirrored front-facing sensors need the opposite sign convention
+      // from a rear sensor for the same physical device rotation.
+      const sensorOrientation = 90;
+      final front = mlKitRotationForCamera(
+        sensorOrientation: sensorOrientation,
+        lensDirection: CameraLensDirection.front,
+        deviceOrientation: DeviceOrientation.landscapeLeft,
+      );
+      final back = mlKitRotationForCamera(
+        sensorOrientation: sensorOrientation,
+        lensDirection: CameraLensDirection.back,
+        deviceOrientation: DeviceOrientation.landscapeLeft,
+      );
+      expect(front, isNot(back));
     });
   });
 

@@ -8,6 +8,25 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.1.2 - 2026-07-23
+
+### Fixed
+
+- **Live face tracking was rotated ~90° on iOS whenever the app isn't
+  locked to a single device orientation.** The ML Kit live-stream path
+  computed the frame rotation from the camera's fixed sensor-mount angle
+  alone on iOS, never combining it with the device's *current*
+  orientation the way the Android path already correctly did. Apps that
+  allow portrait and landscape (rather than locking to one) got face
+  detections rotated relative to reality — visible as landmark dots
+  forming a vertical line down one side of the face instead of a
+  horizontal line across the eyes, confirmed via `debugMode`. Both
+  platforms now share one rotation formula
+  (`mlKitRotationForCamera`, `@visibleForTesting`), matching the design
+  intent of the `camera` plugin's own cross-platform `sensorOrientation`/
+  `DeviceOrientation` abstractions. 5 new regression tests. No public API
+  changes — this is an internal backend fix.
+
 ## 0.1.1 - 2026-07-23
 
 ### Changed

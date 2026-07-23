@@ -22,6 +22,33 @@ const _orientations = <DeviceOrientation, int>{
   DeviceOrientation.landscapeRight: 270,
 };
 
+/// Computes the [InputImageRotation] ML Kit needs to interpret one raw
+/// sensor-space frame correctly, given the camera's fixed mount angle and
+/// the device's *current* orientation. Returns null for an orientation
+/// this recipe can't handle.
+///
+/// Pulled out as a pure function (no [CameraImage]/[CameraController], so
+/// it's unit-testable without a real camera) after a real bug: an earlier
+/// version trusted [sensorOrientation] alone on iOS, without combining it
+/// with [deviceOrientation] the way the Android path already did. That's
+/// only correct for an app locked to one fixed orientation — anything
+/// that allows rotation (like Kalo Chasma's `Info.plist`, which permits
+/// portrait and landscape) got detections rotated ~90° from reality on
+/// iOS, while Android was fine. Both platforms now share one formula.
+@visibleForTesting
+InputImageRotation? mlKitRotationForCamera({
+  required int sensorOrientation,
+  required CameraLensDirection lensDirection,
+  required DeviceOrientation? deviceOrientation,
+}) {
+  final rotationCompensation = _orientations[deviceOrientation];
+  if (rotationCompensation == null) return null;
+  final combined = lensDirection == CameraLensDirection.front
+      ? (sensorOrientation + rotationCompensation) % 360
+      : (sensorOrientation - rotationCompensation + 360) % 360;
+  return InputImageRotationValue.fromRawValue(combined);
+}
+
 /// Builds an [InputImage] from one raw camera frame, computing the rotation
 /// ML Kit needs to interpret sensor-space pixels correctly. Returns null for
 /// a frame this recipe can't handle (unknown device orientation, multi-plane
@@ -31,22 +58,11 @@ InputImage? mlKitInputImageFromCameraImage(
   CameraController controller,
 ) {
   final camera = controller.description;
-  final sensorOrientation = camera.sensorOrientation;
-  InputImageRotation? rotation;
-  if (defaultTargetPlatform == TargetPlatform.iOS) {
-    rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
-  } else if (defaultTargetPlatform == TargetPlatform.android) {
-    var rotationCompensation =
-        _orientations[controller.value.deviceOrientation];
-    if (rotationCompensation == null) return null;
-    if (camera.lensDirection == CameraLensDirection.front) {
-      rotationCompensation = (sensorOrientation + rotationCompensation) % 360;
-    } else {
-      rotationCompensation =
-          (sensorOrientation - rotationCompensation + 360) % 360;
-    }
-    rotation = InputImageRotationValue.fromRawValue(rotationCompensation);
-  }
+  final rotation = mlKitRotationForCamera(
+    sensorOrientation: camera.sensorOrientation,
+    lensDirection: camera.lensDirection,
+    deviceOrientation: controller.value.deviceOrientation,
+  );
   if (rotation == null) return null;
 
   final format = InputImageFormatValue.fromRawValue(image.format.raw);

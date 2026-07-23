@@ -667,3 +667,34 @@ would misrepresent the app's real capabilities to reviewers, repeating
 the exact App Store rejection scenario #020 was written to avoid. The
 example still runs on macOS (calibration/debug demos work without a
 detected face), it just won't request camera access there.
+
+---
+
+# Decision 035
+
+## iOS live-stream rotation must combine sensorOrientation with the device's current orientation, not trust sensorOrientation alone
+
+Status: Accepted (0.1.2, post-M7)
+
+`mlKitInputImageFromCameraImage`'s iOS branch used to compute
+`InputImageRotationValue.fromRawValue(sensorOrientation)` directly —
+the camera's fixed mount angle, with no reference to how the device is
+actually being held. The Android branch, by contrast, already combined
+`sensorOrientation` with `controller.value.deviceOrientation`. Both
+platforms now share one formula
+(`mlKitRotationForCamera`, `@visibleForTesting`).
+
+Reason: a real downstream bug, not a hypothetical one. Kalo Chasma (the
+donor app this package was extracted from) allows portrait and
+landscape in `Info.plist` — it isn't locked to one orientation. With the
+old iOS-only-sensorOrientation code, live face detections came back
+rotated ~90° from reality: landmark dots formed a vertical line down one
+side of the face instead of a horizontal line across the eyes,
+confirmed visually via `debugMode`'s eye-center/landmark markers on a
+real device. The `camera` plugin deliberately normalizes
+`sensorOrientation` and exposes `DeviceOrientation` identically on both
+platforms specifically so consuming code doesn't need to special-case
+per platform — the original asymmetric branching was the bug, not a
+necessary platform difference. Only correct if an app is locked to a
+single fixed orientation, which this package must not assume of every
+consumer.
