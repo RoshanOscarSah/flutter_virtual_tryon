@@ -768,6 +768,41 @@ mapping linear and identical to the live widget's, and defers fitting-into-
 the-layout to the standard `AspectRatio` the consumer already knows.
 
 `mirror` defaults to `false` here (a saved photo isn't selfie-mirrored like
-a live preview), and no `swapLeftRight` is applied — a normal photo already
-matches the unmirrored, subject-left-on-frame's-right convention (#015). A
-photo that *was* stored mirrored is a documented edge case that may misalign.
+a live preview), and no `swapLeftRight` is applied by default — a normal
+photo already matches the unmirrored, subject-left-on-frame's-right
+convention (#015). A photo that *was* stored mirrored is handled by
+`mirroredSource` (below).
+
+## Mirrored-source photos are corrected by a user-facing flip, not a guess
+
+Status: Accepted (0.3.0)
+
+A front-camera selfie is commonly saved *mirrored* (iOS's "Mirror Front
+Camera" setting, on by default). A mirrored photo reports its eyes on the
+sides opposite the unmirrored convention (#015), so an eye-anchored overlay
+derives its rotation from a reversed eye vector and renders 180°/upside-down
+— exactly the symptom the live iOS front camera already fixes with a
+`swapLeftRight` relabel. The still path had no equivalent, so mirrored
+selfies came out reversed while normal photos (rear camera, or taken by
+someone else) were fine.
+
+`VirtualTryOnImage(mirroredSource: true)` applies the same correction:
+`TrackingData.swapLeftRight()` relabels the detected left/right landmarks
+(eyes, irises, ears) — a *relabel*, not a coordinate flip — so the eye
+vector (and overlay rotation) reverses while `eyeCenter`/`eyeDistance`, and
+thus the overlay's position, are untouched. It deliberately does **not** flip
+the displayed photo (unlike `mirror`): the subject keeps seeing their
+familiar selfie, just with correctly-oriented frames.
+
+Reason (a flag, not auto-detection): there is no reliable signal that a given
+photo was mirrored — EXIF doesn't record it, and inferring it from content is
+guesswork that would flip correct photos. So the honest design is a
+user-facing "flip" toggle the consumer wires to `mirroredSource`, defaulting
+false so normal photos (the common non-selfie case) stay correct.
+
+Reason (relabel on `TrackingData`, not a new `detectStill` parameter): doing
+it as a pure transform of already-detected data keeps the frozen backend
+`detectStill(bytes)` contract untouched, works uniformly across ML Kit,
+MediaPipe, and mock backends, and makes toggling instant — no re-detection,
+just a repaint. `swapLeftRight()` is public because it's genuinely useful to
+consumers doing their own still handling.

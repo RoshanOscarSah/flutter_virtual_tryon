@@ -230,7 +230,8 @@ VirtualTryOnImage(
   ],
 
   backend: VisionBackend.auto(),   // optional; same backends as VirtualTryOn
-  mirror: false,                   // optional; photos aren't selfie-mirrored
+  mirror: false,                   // optional; flips the displayed photo
+  mirroredSource: false,           // optional; corrects a mirrored selfie
 
   loadingBuilder: (context) {},    // optional; while detection runs
   noFaceBuilder: (context) {},     // optional; when no face is found
@@ -254,7 +255,19 @@ pick or a captured image rather than a live camera.
   bounded box (`Expanded`, `Center`, a sized parent) like any
   `AspectRatio`.
 - **`mirror` defaults to `false`** (a saved photo isn't mirrored like a
-  live selfie preview). A photo that *was* stored mirrored may place
-  overlays as a mirror image.
+  live selfie preview). `mirror` flips the *displayed* photo and overlays.
+- **`mirroredSource` defaults to `false`.** Set it true when the photo was
+  captured mirrored — most often a front-camera selfie (iOS's "Mirror Front
+  Camera"). Such a photo reports its eyes on the opposite sides, so eyewear
+  would render reversed/upside-down. `mirroredSource` relabels the detected
+  left/right landmarks (`TrackingData.swapLeftRight`) so frames face the
+  right way, **without** flipping the displayed photo — distinct from
+  `mirror`. There's no reliable "was this mirrored?" signal, so surface it as
+  a user-facing flip toggle; toggling repaints instantly (no re-detection).
 - Same `VisionBackend` / `VisionBackendException` / `TrackingData` types as
   the live widget; `MockVisionBackend(stillResult: ...)` drives it in tests.
+
+`TrackingData.swapLeftRight()` is public for consumers doing their own still
+handling: it returns a copy with the subject's left/right landmarks (eyes,
+irises, ears) relabeled while every coordinate stays put — reversing the eye
+vector (and thus overlay rotation) without moving the overlay.

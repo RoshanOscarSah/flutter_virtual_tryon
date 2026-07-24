@@ -129,6 +129,38 @@ class TrackingData {
   /// closer"), not absolute physical size.
   double get scale => eyeDistance;
 
+  /// Returns a copy with the subject's left- and right-side landmarks
+  /// relabeled — each left field takes the right field's value and vice
+  /// versa — while every coordinate stays exactly where it was.
+  ///
+  /// This corrects a **mirrored source**. A front-camera selfie saved with
+  /// mirroring (iOS's "Mirror Front Camera") — or any horizontally flipped
+  /// photo — reports its eyes on the sides opposite this class's
+  /// subject-relative convention. An eye-anchored overlay then derives its
+  /// rotation from a reversed eye vector and renders flipped/upside-down.
+  /// Swapping the labels reverses the eye vector (a 180° change in
+  /// [rotationRadians]) *without moving the overlay*: [eyeCenter] and
+  /// [eyeDistance] are unchanged, so eyewear stays on the eyes but faces the
+  /// right way.
+  ///
+  /// This is the still-image analogue of the live iOS front-camera relabel;
+  /// `VirtualTryOnImage(mirroredSource: true)` applies it for you.
+  TrackingData swapLeftRight() => TrackingData(
+        boundingBox: boundingBox,
+        leftEye: rightEye,
+        rightEye: leftEye,
+        confidence: confidence,
+        leftIris: rightIris,
+        rightIris: leftIris,
+        nose: nose,
+        chin: chin,
+        forehead: forehead,
+        leftEar: rightEar,
+        rightEar: leftEar,
+        fps: fps,
+        timestamp: timestamp,
+      );
+
   @override
   bool operator ==(Object other) {
     return other is TrackingData &&

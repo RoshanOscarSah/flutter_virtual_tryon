@@ -8,6 +8,26 @@ project uses [Semantic Versioning](https://semver.org/) (see
 
 ## Unreleased
 
+## 0.3.0 - 2026-07-24
+
+### Added
+
+- **`VirtualTryOnImage(mirroredSource: true)`** — corrects a mirrored-source
+  photo. A front-camera selfie saved with iOS's "Mirror Front Camera"
+  setting reports its eyes on the sides opposite the unmirrored convention,
+  so eyewear overlays render reversed/upside-down. Setting `mirroredSource`
+  relabels the detected left/right landmarks so frames face the right way,
+  without flipping the displayed photo. Defaults to false; there's no
+  reliable metadata that says a photo was mirrored, so expose it as a
+  user-facing "flip" toggle rather than guessing. The still-image analogue
+  of the live iOS front-camera relabel.
+- **`TrackingData.swapLeftRight()`** — returns a copy with the subject's
+  left/right landmarks relabeled (eyes, irises, ears) while every coordinate
+  stays put. Reverses the eye vector — and thus overlay rotation — without
+  moving the overlay (`eyeCenter`/`eyeDistance` unchanged). Backs
+  `mirroredSource` and is available for consumers doing custom still
+  handling.
+
 ## 0.2.0 - 2026-07-23
 
 ### Added

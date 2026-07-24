@@ -79,6 +79,58 @@ void main() {
       expect(text, contains('eyes: '));
       expect(text, contains('confidence: 0.90)'));
     });
+
+    group('swapLeftRight (mirrored-source correction)', () {
+      test('swaps left/right landmarks but keeps their coordinates', () {
+        const d = TrackingData(
+          boundingBox: Rect.fromLTWH(0.3, 0.25, 0.4, 0.5),
+          leftEye: Offset(0.6, 0.5),
+          rightEye: Offset(0.4, 0.4),
+          confidence: 0.9,
+          leftIris: Offset(0.61, 0.5),
+          rightIris: Offset(0.41, 0.4),
+          leftEar: Offset(0.8, 0.5),
+          rightEar: Offset(0.2, 0.4),
+        );
+        final s = d.swapLeftRight();
+        expect(s.leftEye, d.rightEye);
+        expect(s.rightEye, d.leftEye);
+        expect(s.leftIris, d.rightIris);
+        expect(s.rightIris, d.leftIris);
+        expect(s.leftEar, d.rightEar);
+        expect(s.rightEar, d.leftEar);
+      });
+
+      test('leaves the eye midpoint and distance untouched', () {
+        final d = _data(
+          leftEye: const Offset(0.6, 0.5),
+          rightEye: const Offset(0.4, 0.4),
+        );
+        final s = d.swapLeftRight();
+        expect(s.eyeCenter, d.eyeCenter);
+        expect(s.eyeDistance, closeTo(d.eyeDistance, 1e-12));
+      });
+
+      test('reverses the eye vector — a 180° roll change (the bug fix)', () {
+        // A mirrored selfie reports its eye vector reversed, so eyewear
+        // renders 180°/upside-down; relabeling reverses it back. This is the
+        // same correction the live iOS front camera applies.
+        final d = _data(
+          rightEye: const Offset(0.4, 0.4),
+          leftEye: const Offset(0.6, 0.5),
+        );
+        expect(d.rotation, closeTo(26.565051177077994, 1e-9));
+        expect(d.swapLeftRight().rotation, closeTo(-153.43494882292202, 1e-9));
+      });
+
+      test('is its own inverse', () {
+        final d = _data(
+          leftEye: const Offset(0.6, 0.5),
+          rightEye: const Offset(0.4, 0.4),
+        );
+        expect(d.swapLeftRight().swapLeftRight(), equals(d));
+      });
+    });
   });
 
   group('OverlayConstraints.isSatisfiedBy', () {

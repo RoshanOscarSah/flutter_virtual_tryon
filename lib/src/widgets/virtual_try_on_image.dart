@@ -45,6 +45,7 @@ class VirtualTryOnImage extends StatefulWidget {
     required this.overlays,
     this.backend,
     this.mirror = false,
+    this.mirroredSource = false,
     this.loadingBuilder,
     this.noFaceBuilder,
     this.onFaceDetected,
@@ -63,6 +64,20 @@ class VirtualTryOnImage extends StatefulWidget {
   /// Whether to mirror the photo and overlays horizontally. Defaults to
   /// false — unlike the live selfie preview, a saved photo isn't mirrored.
   final bool mirror;
+
+  /// Set true when the supplied photo was captured *mirrored* — most
+  /// commonly a front-camera selfie saved with iOS's "Mirror Front Camera"
+  /// setting. Such a photo reports its eyes on the opposite sides from the
+  /// unmirrored convention, so eyewear overlays would otherwise render
+  /// reversed/upside-down. This relabels the detected left/right landmarks
+  /// ([TrackingData.swapLeftRight]) so frames face the right way, *without*
+  /// flipping the displayed photo (the subject still sees their familiar
+  /// selfie). Distinct from [mirror], which flips the display itself.
+  ///
+  /// There's no reliable metadata that says a photo was mirrored, so expose
+  /// this as a user-facing "flip" control rather than guessing. Defaults to
+  /// false (a normal photo).
+  final bool mirroredSource;
 
   /// Built while detection is running. Defaults to a centered blank box.
   final WidgetBuilder? loadingBuilder;
@@ -193,7 +208,14 @@ class _VirtualTryOnImageState extends State<VirtualTryOnImage> {
       return widget.noFaceBuilder!(context);
     }
 
-    final tracking = _tracking;
+    // A mirrored-source photo (a front-camera selfie) reports left/right
+    // landmarks reversed; relabel them so eyewear faces the right way. Pure
+    // transform of already-detected data — toggling [mirroredSource] repaints
+    // instantly with no re-detection.
+    final detected = _tracking;
+    final tracking = detected != null && widget.mirroredSource
+        ? detected.swapLeftRight()
+        : detected;
     return AspectRatio(
       aspectRatio: size.width / size.height,
       child: RepaintBoundary(

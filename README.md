@@ -105,6 +105,30 @@ itself to the photo's aspect ratio (place it in an `Expanded`/`Center`/sized
 box). `mirror` defaults to `false` since a saved photo isn't selfie-mirrored.
 See [`example/lib/demos/photo_demo.dart`](example/lib/demos/photo_demo.dart).
 
+### Mirrored selfies (`mirroredSource`)
+
+A **front-camera selfie** is usually saved *mirrored* (iOS's "Mirror Front
+Camera" setting). A mirrored photo reports its eyes on the opposite sides
+from the normal convention, so eyewear overlays render reversed/upside-down —
+while a normal photo (rear camera, or one taken by someone else) is fine.
+There's no reliable metadata that tells you a photo was mirrored, so expose a
+**"flip" toggle** and pass it through:
+
+```dart
+VirtualTryOnImage(
+  imageBytes: photoBytes,
+  overlays: [GlassesOverlay(image: AssetImage('assets/rayban.png'))],
+  mirroredSource: userTappedFlip, // relabels left/right so frames face right
+)
+```
+
+`mirroredSource` relabels the detected landmarks
+([`TrackingData.swapLeftRight`](lib/src/models/tracking_data.dart)) so frames
+face the right way **without** flipping the displayed photo (the subject
+still sees their familiar selfie). It's the still-image analogue of the
+correction the live front-camera preview applies automatically. Toggling it
+is instant — no re-detection.
+
 ## Built-in overlays
 
 - **`GlassesOverlay`** / **`SunglassesOverlay`** — an `ImageProvider`
